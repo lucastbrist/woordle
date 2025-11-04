@@ -1,13 +1,13 @@
 package com.ltb.woordle.models;
-import lombok.*;
 
+import lombok.*;
 import java.util.ArrayList;
 
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class Word {
 
     private String word;
