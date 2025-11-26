@@ -20,6 +20,8 @@ public class WordService {
 
     public String getRandomWord(int length) {
 
+        // Gets a random word from the dictionary API.
+
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
         headers.set("x-rapidapi-key", apiKey);
@@ -38,46 +40,41 @@ public class WordService {
 
     }
 
-//    public boolean isValidWord(String word) throws Exception {
-//    }
+    public void handleGuess(Character[] characters) {
+        String guess = concatenateGuess(characters);
+        if (isValidWord(guess)) {
+            // check if word is then also the correct word
+        }
+    }
 
-//    public String generateFeedback(String guess, String target) {
-//        guess = guess.toUpperCase();
-//        target = target.toUpperCase();
-//
-//        StringBuilder feedback = new StringBuilder();
-//        char[] targetChars = target.toCharArray();
-//        char[] guessChars = guess.toCharArray();
-//        boolean[] targetUsed = new boolean[target.length()];
-//
-//        // First pass: mark correct positions (green)
-//        for (int i = 0; i < guess.length(); i++) {
-//            if (guessChars[i] == targetChars[i]) {
-//                feedback.append('C'); // Correct
-//                targetUsed[i] = true;
-//            } else {
-//                feedback.append('?');
-//            }
-//        }
-//
-//        // Second pass: mark present letters (yellow)
-//        for (int i = 0; i < guess.length(); i++) {
-//            if (feedback.charAt(i) == '?') {
-//                boolean found = false;
-//                for (int j = 0; j < target.length(); j++) {
-//                    if (!targetUsed[j] && guessChars[i] == targetChars[j]) {
-//                        feedback.setCharAt(i, 'P'); // Present
-//                        targetUsed[j] = true;
-//                        found = true;
-//                        break;
-//                    }
-//                }
-//                if (!found) {
-//                    feedback.setCharAt(i, 'A'); // Absent
-//                }
-//            }
-//        }
-//
-//        return feedback.toString();
-//    }
+    public String concatenateGuess(Character[] characters) {
+
+        // Takes in the guessed characters and returns them as a String.
+
+        StringBuilder guess = new StringBuilder();
+        for (Character character : characters) {
+            guess.append(character);
+        }
+        return String.valueOf(guess);
+    }
+
+    public boolean isValidWord(String guess) {
+
+        // Method to validate player guess.
+        // Searches dictionary API for the guessed word.
+        // Returns boolean based on API response.
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
+        headers.set("x-rapidapi-key", apiKey);
+
+        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                "https://wordsapiv1.p.rapidapi.com/words/" + guess,
+                HttpMethod.GET, requestEntity, String.class);
+
+        return response.hasBody() && !response.getStatusCode().is4xxClientError();
+
+    }
 }
