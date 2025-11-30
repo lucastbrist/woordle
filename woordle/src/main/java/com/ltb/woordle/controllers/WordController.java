@@ -13,6 +13,11 @@ public class WordController {
     WordService wordService;
 
     @GetMapping("/random")
+    public String getRandomWord() {
+        return wordService.getRandomWord();
+    }
+
+    @GetMapping("/random")
     public String getRandomWord(@RequestParam int length) {
         return wordService.getRandomWord(length);
     }

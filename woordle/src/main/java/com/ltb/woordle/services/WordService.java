@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -23,12 +24,42 @@ public class WordService {
     @Value("${dictionary.api.key}")
     private String apiKey;
 
+    public String getRandomWord() {
+
+        /*
+         Gets a random word from the dictionary API.
+         It can take any int length in its constructor, but for MVP,
+         it is defaulted to a length of 5.
+         */
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
+            headers.set("x-rapidapi-key", apiKey);
+
+            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    "https://wordsapiv1.p.rapidapi.com/words/?letters=5&random=true",
+                    HttpMethod.GET, requestEntity, String.class);
+
+            if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
+                throw new IllegalArgumentException("No words available");
+            } else {
+                return response.getBody();
+            }
+        } catch (RestClientException | IllegalArgumentException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
     public String getRandomWord(int length) {
 
         /*
          Gets a random word from the dictionary API.
          It can take any int length in its constructor, but for MVP,
-         it is defaulted to a length of 5 by any methods that call it.
+         it is defaulted to a length of 5.
          */
 
         HttpHeaders headers = new HttpHeaders();
@@ -66,6 +97,10 @@ public class WordService {
          Takes in the guessed characters and returns them as a String.
          */
 
+        if (characters == null || characters.isEmpty()) {
+            return "";
+        }
+
         StringBuilder guess = new StringBuilder();
         for (Character character : characters) {
             guess.append(character);
@@ -80,6 +115,10 @@ public class WordService {
          Searches dictionary API for the guessed word.
          Returns boolean based on API response.
         */
+
+        if (guess == null || guess.isEmpty()) {
+            return false;
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
@@ -102,6 +141,10 @@ public class WordService {
          Simply checks String guess for exactly matching String answer.
          */
 
+        if (guess == null || answer == null) {
+            return false;
+        }
+
         return Objects.equals(guess, answer);
     }
 
@@ -115,6 +158,10 @@ public class WordService {
         // First, instantiate an ArrayList<Character> of coded feedback characters to be mapped onto.
         // This array will mark letters in String guess as
         // 'C', 'A', or 'P' for Correct, Absent, or Present, respectively
+
+        if (guess == null || answer == null || guess.length() != answer.length()) {
+            throw new IllegalArgumentException("Guess and answer must be non-null and of the same length.");
+        }
 
         ArrayList<Character> feedbackArray = new ArrayList<>();
         for (int i = 0; i < guess.length(); i++) {
