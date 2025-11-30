@@ -12,6 +12,7 @@ public class Word {
 
     private String word;
     private ArrayList<Character> characters;
+    private ArrayList<Character> currentFeedback;
 
     public void populateCharacters() {
 

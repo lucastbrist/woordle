@@ -9,6 +9,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
 @Service
 public class WordService {
 
@@ -20,7 +25,11 @@ public class WordService {
 
     public String getRandomWord(int length) {
 
-        // Gets a random word from the dictionary API.
+        /*
+         Gets a random word from the dictionary API.
+         It can take any int length in its constructor, but for MVP,
+         it is defaulted to a length of 5 by any methods that call it.
+         */
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
@@ -40,16 +49,22 @@ public class WordService {
 
     }
 
-    public void handleGuess(Character[] characters) {
-        String guess = concatenateGuess(characters);
-        if (isValidWord(guess)) {
-            // check if word is then also the correct word
-        }
-    }
+//    public void handleGuess(ArrayList<Character> characters, String answer) {
+//        String guess = concatenateGuess(characters);
+//        if (isValidWord(guess)) {
+//            if (isCorrectWord(guess, answer)) {
+//                // success!!!
+//            } else {
+//                // check if letters are correct
+//            }
+//        }
+//    }
 
-    public String concatenateGuess(Character[] characters) {
+    public String concatenateGuess(ArrayList<Character> characters) {
 
-        // Takes in the guessed characters and returns them as a String.
+        /*
+         Takes in the guessed characters and returns them as a String.
+         */
 
         StringBuilder guess = new StringBuilder();
         for (Character character : characters) {
@@ -60,9 +75,11 @@ public class WordService {
 
     public boolean isValidWord(String guess) {
 
-        // Method to validate player guess.
-        // Searches dictionary API for the guessed word.
-        // Returns boolean based on API response.
+        /*
+         Method to validate player guess.
+         Searches dictionary API for the guessed word.
+         Returns boolean based on API response.
+        */
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
@@ -74,7 +91,83 @@ public class WordService {
                 "https://wordsapiv1.p.rapidapi.com/words/" + guess,
                 HttpMethod.GET, requestEntity, String.class);
 
+        // wordsapi returns a 404 if a word is not present
         return response.hasBody() && !response.getStatusCode().is4xxClientError();
 
     }
+
+    public boolean isCorrectWord(String guess, String answer) {
+
+        /*
+         Simply checks String guess for exactly matching String answer.
+         */
+
+        return Objects.equals(guess, answer);
+    }
+
+    public ArrayList<Character> checkLetters(String guess, String answer) {
+
+        /*
+         This greater method will check each letter in String guess
+         for presence and position accuracy within String answer by looping through each.
+        */
+
+        // First, instantiate an ArrayList<Character> of coded feedback characters to be mapped onto.
+        // This array will mark letters in String guess as
+        // 'C', 'A', or 'P' for Correct, Absent, or Present, respectively
+
+        ArrayList<Character> feedbackArray = new ArrayList<>();
+        for (int i = 0; i < guess.length(); i++) {
+            feedbackArray.add('A'); // default characters to 'A' for Absent
+        }
+
+        // Second, convert String guess and String answer to ArrayList<Character>
+        ArrayList<Character> guessArray = new ArrayList<>();
+        for (char c : guess.toCharArray()) {
+            guessArray.add(c);
+        }
+        ArrayList<Character> answerArray = new ArrayList<>();
+        for (char c : answer.toCharArray()) {
+            answerArray.add(c);
+        }
+
+        // counts HashMap keeps track of non-matching characters
+        Map<Character, Integer> counts = new HashMap<>();
+
+        // First pass: Loop through guessArray and answerArray,
+        // marking letters as 'C' for Correct in feedbackArray
+        for (int i = 0; i < guessArray.size(); i++) {
+
+            char g = guessArray.get(i);
+            char a = answerArray.get(i);
+
+            if (g == a) {
+                feedbackArray.set(i, 'C');
+            } else {
+                // count only answer letters that were NOT correct
+                counts.put(a, counts.getOrDefault(a, 0) + 1);
+            }
+
+        }
+
+        // Second pass: Loop through guessArray and answerArray,
+        // marking letters as 'P' for Present or 'A' for Absent in feedbackArray
+        for (int i = 0; i < guessArray.size(); i++) {
+            if (feedbackArray.get(i) == 'C') {
+                continue; // because this is already handled
+            }
+
+            char g = guessArray.get(i);
+            Integer count = counts.get(g);
+            if (count != null && count > 0) {
+                feedbackArray.set(i, 'P');      // Present but wrong position
+                counts.put(g, count - 1);       // consume one occurrence
+            } else {
+                feedbackArray.set(i, 'A');      // Absent (already default, but make explicit)
+            }
+        }
+
+        return feedbackArray;
+    }
+
 }
