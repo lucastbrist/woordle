@@ -2,6 +2,8 @@ package com.ltb.woordle.services;
 
 import com.ltb.woordle.exceptions.WordServiceException;
 import com.ltb.woordle.models.Word;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -35,7 +37,8 @@ public class WordService {
     @Value("${dictionary.host}")
     private String hostHeader;
 
-    private HttpEntity<Void> createRequestEntity() {
+    @Contract(" -> new")
+    private @NotNull HttpEntity<Void> createRequestEntity() {
         // RapidAPI requires these headers for authentication
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-rapidapi-host", hostHeader);
@@ -43,14 +46,13 @@ public class WordService {
         return new HttpEntity<>(headers);
     }
 
+    /**
+     * For MVP, fetches a random 5-letter word by wrapping a more flexible API-calling method.
+     * @return a String of length 5 from the dictionary API.
+     */
+    @NotNull
     public String getRandomWord() {
-
-        /*
-         For MVP, gets a random 5-letter word from the dictionary API using getRandomWord(int length).
-         */
-
         return getRandomWord(5);
-
     }
 
     /**
@@ -61,6 +63,7 @@ public class WordService {
      * @throws IllegalArgumentException if length is invalid or no word is available.
      * @throws WordServiceException if there is an error communicating with the dictionary API.
      */
+    @NotNull
     public String getRandomWord(int length) {
 
         if (length <= 0 || length > 15) {
@@ -79,7 +82,7 @@ public class WordService {
                 Word wordObj = objectMapper.readValue(response.getBody(), Word.class);
                 if (wordObj != null) {
                     wordObj.populateCharacters();
-                    return wordObj.getWord().toLowerCase(Locale.ROOT);
+                    return normalizeWord(wordObj.getWord());
                 } else {
                     throw new WordServiceException("Received invalid word from dictionary API");
                 }
@@ -90,42 +93,61 @@ public class WordService {
 
     }
 
+    /**
+     * Greater method handling a player's guess.
+     * Begins by validating the lowercased guess against a regex and the dictionary API.
+     * If valid, checks the guess against the answer for correctness and letter presence.
+     *
+     * @param characters List of Characters representing the player's guess.
+     * @param answer The correct answer word.
+     * @return A List of Characters representing feedback: 'C' for Correct, 'P' for Present, 'A' for Absent.
+     * @throws IllegalArgumentException if input is invalid.
+     */
+    @NotNull
     public List<Character> handleGuess(List<Character> characters, String answer) {
 
         if (characters == null || characters.isEmpty() || answer == null || answer.isEmpty()) {
-            throw new IllegalArgumentException("Characters and answer cannot be null or empty.");
+            throw new IllegalArgumentException("Guessed characters and stored answer cannot be null or empty when handling guess.");
         }
 
-        String normalizedGuess = concatenateGuess(characters).toLowerCase(Locale.ROOT);
-        String normalizedAnswer = answer.toLowerCase(Locale.ROOT);
+        String normalizedGuess = normalizeWord(concatenateGuess(characters));
+        String normalizedAnswer = normalizeWord(answer);
         List<Character> feedback = new ArrayList<>();
 
         // If the guessed word is valid, check it against the answer
-        if (isValidWord(normalizedGuess)) {
+        if (isValidAlphabeticWord(normalizedGuess) && isValidDictionaryWord(normalizedGuess)) {
+            // If the guess is exactly correct, return all 'C's
             if (isCorrectWord(normalizedGuess, normalizedAnswer)) {
-
-                // If the guess is exactly correct, return all 'C's
                 for (int i = 0; i < normalizedGuess.length(); i++) {
                     feedback.add('C');
                 }
-
             // Else, check letters for presence and position
             } else {
                 feedback = checkLetters(normalizedGuess, normalizedAnswer);
             }
+        } else {
+            throw new IllegalArgumentException("Could not validate guess \"" + normalizedGuess + "\"");
         }
 
         return feedback;
 
     }
 
-    public String concatenateGuess(List<Character> characters) {
+    @Contract("null -> fail")
+    private @NotNull String normalizeWord(String word) {
+        if (word == null || word.isEmpty()) {
+            throw new IllegalArgumentException("Word passed to normalize cannot be null or empty.");
+        }
+        return word.toLowerCase(Locale.ROOT);
+    }
+
+    @Contract("null -> fail")
+    private @NotNull String concatenateGuess(List<Character> characters) {
 
         if (characters == null || characters.isEmpty()) {
             throw new IllegalArgumentException("Character list cannot be null or empty.");
         }
 
-        // Concatenate characters into a String
         StringBuilder guess = new StringBuilder();
         for (Character character : characters) {
             guess.append(character);
@@ -133,7 +155,17 @@ public class WordService {
         return guess.toString();
     }
 
-    public boolean isValidWord(String guess) {
+    @Contract("null -> fail")
+    private boolean isValidAlphabeticWord(String word) {
+        if (word == null || word.isEmpty()) {
+            throw new IllegalArgumentException("Word passed to alphabetic validation cannot be null.");
+        }
+        // Regex to allow only a-z and A-Z letters
+        return word.matches("^[a-zA-Z]+$");
+    }
+
+    @Contract("null -> fail")
+    private boolean isValidDictionaryWord(String guess) {
 
         /*
          Method to validate player guess.
@@ -142,13 +174,13 @@ public class WordService {
         */
 
         if (guess == null || guess.isEmpty()) {
-            return false;
+            throw new IllegalArgumentException("Word passed to dictionary validation cannot be null or empty.");
         }
 
         try {
             HttpEntity<Void> requestEntity = createRequestEntity();
             ResponseEntity<String> response = restTemplate.exchange(
-                    baseUrl +"/" + guess.toLowerCase(Locale.ROOT),
+                    baseUrl +"/" + guess,
                     HttpMethod.GET, requestEntity, String.class);
 
             // wordsapi returns a 404 if a word is not present
@@ -159,12 +191,12 @@ public class WordService {
 
     }
 
-    public boolean isCorrectWord(String guess, String answer) {
+    @Contract("null, _ -> fail; !null, null -> fail")
+    private boolean isCorrectWord(String guess, String answer) {
 
-        if (guess == null || answer == null) {
-            throw new IllegalArgumentException("Guess and answer cannot be null.");
+        if (guess == null || answer == null || guess.isEmpty() || answer.isEmpty()) {
+            throw new IllegalArgumentException("Guess and answer passed to isCorrectWord() cannot be null or empty.");
         }
-
         return Objects.equals(guess, answer);
     }
 
@@ -176,10 +208,11 @@ public class WordService {
      * @param answer the stored answer word
      * @return a List of Characters representing feedback for each letter in the guess
      */
-    public List<Character> checkLetters(String guess, String answer) {
+    @Contract("null, _ -> fail; !null, null -> fail")
+    private @NotNull List<Character> checkLetters(String guess, String answer) {
 
-        if (guess == null || answer == null || guess.length() != answer.length()) {
-            throw new IllegalArgumentException("Guess and answer must be non-null and of the same length.");
+        if (guess == null || answer == null || guess.isEmpty() || answer.isEmpty() || guess.length() != answer.length()) {
+            throw new IllegalArgumentException("Guess and answer passed to checkLetters() must be non-null, non-empty, and of the same length.");
         }
 
         ArrayList<Character> feedbackArray = new ArrayList<>();
