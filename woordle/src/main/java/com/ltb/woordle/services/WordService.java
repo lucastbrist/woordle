@@ -9,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,9 +29,12 @@ public class WordService {
          Gets a random word from the dictionary API.
          It can take any int length in its constructor, but for MVP,
          it is defaulted to a length of 5.
+
+         This is the base method that does not take in length as an argument.
          */
 
         try {
+            // Establish headers for API request because RapidAPI requires them
             HttpHeaders headers = new HttpHeaders();
             headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
             headers.set("x-rapidapi-key", apiKey);
@@ -60,36 +62,68 @@ public class WordService {
          Gets a random word from the dictionary API.
          It can take any int length in its constructor, but for MVP,
          it is defaulted to a length of 5.
+
+         This is the overloaded method that takes in length as an argument.
          */
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
-        headers.set("x-rapidapi-key", apiKey);
+        // Input validation
+        if (length <= 0) {
+            throw new IllegalArgumentException("Length must be a positive integer.");
+        }
 
-        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+        try {
+            // Establish headers for API request because RapidAPI requires them
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
+            headers.set("x-rapidapi-key", apiKey);
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                "https://wordsapiv1.p.rapidapi.com/words/?letters=" + length + "&random=true",
-                HttpMethod.GET, requestEntity, String.class);
+            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
-        if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
-            throw new IllegalArgumentException("No words of length " + length + " available");
-        } else {
-            return response.getBody();
+            ResponseEntity<String> response = restTemplate.exchange(
+                    "https://wordsapiv1.p.rapidapi.com/words/?letters=" + length + "&random=true",
+                    HttpMethod.GET, requestEntity, String.class);
+
+            if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
+                throw new IllegalArgumentException("No words of length " + length + " available");
+            } else {
+                return response.getBody();
+            }
+        } catch (RestClientException | IllegalArgumentException e) {
+            throw new RuntimeException(e);
         }
 
     }
 
-//    public void handleGuess(ArrayList<Character> characters, String answer) {
-//        String guess = concatenateGuess(characters);
-//        if (isValidWord(guess)) {
-//            if (isCorrectWord(guess, answer)) {
-//                // success!!!
-//            } else {
-//                // check if letters are correct
-//            }
-//        }
-//    }
+    public ArrayList<Character> handleGuess(ArrayList<Character> characters, String answer) {
+
+        /*
+         The greater method that handles a player's guess.
+         */
+
+        // First, concatenate the player's guessed characters into a String
+        String guess = concatenateGuess(characters);
+
+        // Instantiate an ArrayList<Character> to hold feedback to be returned
+        ArrayList<Character> feedback = new ArrayList<>();
+
+        // If the guessed word is valid, check it against the answer
+        if (isValidWord(guess)) {
+            if (isCorrectWord(guess, answer)) {
+
+                // If the guess is exactly correct, return all 'C's
+                for (int i = 0; i < guess.length(); i++) {
+                    feedback.add('C');
+                }
+
+            // Else, check letters for presence and position
+            } else {
+                feedback = checkLetters(guess, answer);
+            }
+        }
+
+        return feedback;
+
+    }
 
     public String concatenateGuess(ArrayList<Character> characters) {
 
@@ -97,10 +131,12 @@ public class WordService {
          Takes in the guessed characters and returns them as a String.
          */
 
+        // Input validation
         if (characters == null || characters.isEmpty()) {
-            return "";
+            throw new RuntimeException("Character list cannot be null or empty.");
         }
 
+        // Concatenate characters into a String
         StringBuilder guess = new StringBuilder();
         for (Character character : characters) {
             guess.append(character);
@@ -116,22 +152,28 @@ public class WordService {
          Returns boolean based on API response.
         */
 
+        // Input validation
         if (guess == null || guess.isEmpty()) {
             return false;
         }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
-        headers.set("x-rapidapi-key", apiKey);
+        try {
+            // Establish headers for API request because RapidAPI requires them
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
+            headers.set("x-rapidapi-key", apiKey);
 
-        HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                "https://wordsapiv1.p.rapidapi.com/words/" + guess,
-                HttpMethod.GET, requestEntity, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    "https://wordsapiv1.p.rapidapi.com/words/" + guess,
+                    HttpMethod.GET, requestEntity, String.class);
 
-        // wordsapi returns a 404 if a word is not present
-        return response.hasBody() && !response.getStatusCode().is4xxClientError();
+            // wordsapi returns a 404 if a word is not present
+            return response.hasBody() && !response.getStatusCode().is4xxClientError();
+        } catch (RestClientException e) {
+            throw new RuntimeException(e);
+        }
 
     }
 
@@ -141,8 +183,9 @@ public class WordService {
          Simply checks String guess for exactly matching String answer.
          */
 
+        // Input validation
         if (guess == null || answer == null) {
-            return false;
+            throw new RuntimeException("Guess and answer cannot be null.");
         }
 
         return Objects.equals(guess, answer);
@@ -155,14 +198,14 @@ public class WordService {
          for presence and position accuracy within String answer by looping through each.
         */
 
-        // First, instantiate an ArrayList<Character> of coded feedback characters to be mapped onto.
-        // This array will mark letters in String guess as
-        // 'C', 'A', or 'P' for Correct, Absent, or Present, respectively
-
+        // Input validation
         if (guess == null || answer == null || guess.length() != answer.length()) {
             throw new IllegalArgumentException("Guess and answer must be non-null and of the same length.");
         }
 
+        // First, instantiate an ArrayList<Character> of coded feedback characters to be mapped onto.
+        // This array will mark letters in String guess as
+        // 'C', 'A', or 'P' for Correct, Absent, or Present, respectively
         ArrayList<Character> feedbackArray = new ArrayList<>();
         for (int i = 0; i < guess.length(); i++) {
             feedbackArray.add('A'); // default characters to 'A' for Absent
