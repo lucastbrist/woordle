@@ -123,7 +123,8 @@ public class WordService {
     public List<Character> handleGuess(List<Character> characters, String answer) {
 
         if (characters == null || characters.isEmpty() || answer == null || answer.isEmpty()) {
-            throw new IllegalArgumentException("Guessed characters and stored answer cannot be null or empty when handling guess.");
+            throw new IllegalArgumentException("Guessed characters and stored answer " +
+                    "cannot be null or empty when handling guess.");
         }
 
         String normalizedGuess = normalizeWord(concatenateGuess(characters));
