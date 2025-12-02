@@ -1,5 +1,6 @@
 package com.ltb.woordle.services;
 
+import com.ltb.woordle.exceptions.WordServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -72,8 +73,8 @@ public class WordService {
             } else {
                 return response.getBody();
             }
-        } catch (RestClientException | IllegalArgumentException e) {
-            throw new RuntimeException(e);
+        } catch (RestClientException e) {
+            throw new WordServiceException("Failed to fetch random word from dictionary API", e);
         }
 
     }
@@ -86,7 +87,7 @@ public class WordService {
 
         // Input validation
         if (characters == null || characters.isEmpty() || answer == null || answer.isEmpty()) {
-            throw new RuntimeException("Characters and answer cannot be null or empty.");
+            throw new IllegalArgumentException("Characters and answer cannot be null or empty.");
         }
 
         // First, concatenate the player's guessed characters into a String
@@ -122,7 +123,7 @@ public class WordService {
 
         // Input validation
         if (characters == null || characters.isEmpty()) {
-            throw new RuntimeException("Character list cannot be null or empty.");
+            throw new IllegalArgumentException("Character list cannot be null or empty.");
         }
 
         // Concatenate characters into a String
@@ -161,7 +162,7 @@ public class WordService {
             // wordsapi returns a 404 if a word is not present
             return response.hasBody() && !response.getStatusCode().is4xxClientError();
         } catch (RestClientException e) {
-            throw new RuntimeException(e);
+            throw new WordServiceException("Failed to fetch random word from dictionary API", e);
         }
 
     }
