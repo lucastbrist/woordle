@@ -1,113 +1,19 @@
 package com.ltb.woordle.services;
 
-import com.ltb.woordle.exceptions.WordServiceException;
-import com.ltb.woordle.models.Word;
+import com.ltb.woordle.exceptions.DictionaryServiceException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static com.ltb.woordle.utils.WordValidator.*;
 
-import java.io.IOException;
 import java.util.*;
-import java.util.regex.Pattern;
 
 @Service
 public class WordService {
 
-    private final RestTemplate restTemplate;
-
-    private final ObjectMapper objectMapper;
-
-    /**
-     * Regex to allow only a-z and A-Z letters in fetched and guessed words.
-     */
-    private static final Pattern ALPHABETIC_PATTERN = Pattern.compile("^[a-zA-Z]+$");
-
-    public WordService(RestTemplate restTemplate, ObjectMapper objectMapper) {
-        this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
-    }
-
-    @Value("${dictionary.api.key}")
-    private String apiKey;
-
-    @Value("${dictionary.base-url}")
-    private String baseUrl;
-
-    @Value("${dictionary.host}")
-    private String hostHeader;
-
-    @Contract(" -> new")
-    private @NotNull HttpEntity<Void> createRequestEntity() {
-        // RapidAPI requires these headers for authentication
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("x-rapidapi-host", hostHeader);
-        headers.set("x-rapidapi-key", apiKey);
-        return new HttpEntity<>(headers);
-    }
-
-    /**
-     * For MVP, fetches a random 5-letter word by wrapping a more flexible API-calling method.
-     *
-     * @return a String of length 5 from the dictionary API.
-     */
-    @NotNull
-    public String getRandomWord() {
-        return getRandomWord(5);
-    }
-
-    /**
-     * Fetches a random word of the specified length from the dictionary API.
-     *
-     * @param length length of the desired word; must be between 1 and 15.
-     * @return a random word of the specified length.
-     * @throws IllegalArgumentException if length is invalid or no word is available.
-     * @throws WordServiceException     if there is an error communicating with the dictionary API.
-     */
-    @NotNull
-    public String getRandomWord(int length) {
-        if (length <= 0 || length > 15) {
-            throw new IllegalArgumentException("Length must be a positive integer no greater than 15.");
-        }
-
-        try {
-
-            HttpEntity<Void> requestEntity = createRequestEntity();
-            String word;
-
-            do {
-                ResponseEntity<String> response = restTemplate.exchange(
-                        baseUrl + "/words/?letters=" + length + "&random=true",
-                        HttpMethod.GET, requestEntity, String.class);
-
-                if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
-                    throw new IllegalArgumentException("No words of length " + length + " available");
-                }
-
-                Word wordObj = objectMapper.readValue(response.getBody(), Word.class);
-
-                if (wordObj == null) {
-                    throw new WordServiceException("Received invalid word from dictionary API");
-                }
-
-                wordObj.populateCharacters();
-                word = normalizeWord(wordObj.getWord());
-
-            } while (!isValidAlphabeticWord(word));
-
-            return word;
-
-        } catch (RestClientException | IOException e) {
-            throw new WordServiceException("Failed to fetch or parse random word from dictionary API", e);
-        }
-    }
+    @Autowired
+    DictionaryService dictionaryService;
 
     /**
      * Greater method handling a player's guess.
@@ -132,18 +38,22 @@ public class WordService {
         List<Character> feedback = new ArrayList<>();
 
         // If the guessed word is valid, check it against the answer
-        if (isValidAlphabeticWord(normalizedGuess) && isValidDictionaryWord(normalizedGuess)) {
-            // If the guess is exactly correct, return all 'C's
-            if (isCorrectWord(normalizedGuess, normalizedAnswer)) {
-                for (int i = 0; i < normalizedGuess.length(); i++) {
-                    feedback.add('C');
+        try {
+            if (isValidAlphabeticWord(normalizedGuess) && dictionaryService.isValidDictionaryWord(normalizedGuess)) {
+                // If the guess is exactly correct, return all 'C's
+                if (isCorrectWord(normalizedGuess, normalizedAnswer)) {
+                    for (int i = 0; i < normalizedGuess.length(); i++) {
+                        feedback.add('C');
+                    }
+                // Else, check letters for presence and position
+                } else {
+                    feedback = checkLetters(normalizedGuess, normalizedAnswer);
                 }
-            // Else, check letters for presence and position
             } else {
-                feedback = checkLetters(normalizedGuess, normalizedAnswer);
+                throw new IllegalArgumentException("Could not validate guess \"" + normalizedGuess + "\"");
             }
-        } else {
-            throw new IllegalArgumentException("Could not validate guess \"" + normalizedGuess + "\"");
+        } catch (IllegalArgumentException e) {
+            throw new DictionaryServiceException("Could not validate guess \"" + normalizedGuess + "\"", e);
         }
 
         return feedback;
@@ -151,15 +61,8 @@ public class WordService {
     }
 
     @Contract("null -> fail")
-    private @NotNull String normalizeWord(String word) {
-        if (word == null || word.isEmpty()) {
-            throw new IllegalArgumentException("Word passed to normalize cannot be null or empty.");
-        }
-        return word.toLowerCase(Locale.ROOT);
-    }
-
-    @Contract("null -> fail")
-    private @NotNull String concatenateGuess(List<Character> characters) {
+    @NotNull
+    private String concatenateGuess(List<Character> characters) {
 
         if (characters == null || characters.isEmpty()) {
             throw new IllegalArgumentException("Character list cannot be null or empty.");
@@ -170,41 +73,6 @@ public class WordService {
             guess.append(character);
         }
         return guess.toString();
-    }
-
-    @Contract("null -> fail")
-    private boolean isValidAlphabeticWord(String word) {
-        if (word == null || word.isEmpty()) {
-            throw new IllegalArgumentException("Word passed to alphabetic validation cannot be null.");
-        }
-        return ALPHABETIC_PATTERN.matcher(word).matches();
-    }
-
-    @Contract("null -> fail")
-    private boolean isValidDictionaryWord(String guess) {
-
-        /*
-         Method to validate player guess.
-         Searches dictionary API for the guessed word.
-         Returns boolean based on API response.
-        */
-
-        if (guess == null || guess.isEmpty()) {
-            throw new IllegalArgumentException("Word passed to dictionary validation cannot be null or empty.");
-        }
-
-        try {
-            HttpEntity<Void> requestEntity = createRequestEntity();
-            ResponseEntity<String> response = restTemplate.exchange(
-                    baseUrl + "/" + guess,
-                    HttpMethod.GET, requestEntity, String.class);
-
-            // WordsAPI returns a 404 if a word is not present
-            return response.getStatusCode().is2xxSuccessful();
-        } catch (RestClientException e) {
-            throw new WordServiceException("Failed to validate word \"" + guess + "\"", e);
-        }
-
     }
 
     @Contract("null, _ -> fail; !null, null -> fail")
