@@ -1,7 +1,7 @@
 package com.ltb.woordle.services;
 
 import com.ltb.woordle.exceptions.WordServiceException;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.ltb.woordle.models.Word;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -10,7 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.util.*;
 
 @Service
@@ -18,17 +19,20 @@ public class WordService {
 
     private final RestTemplate restTemplate;
 
-    public WordService(RestTemplate restTemplate) {
+    private final ObjectMapper objectMapper;
+
+    public WordService(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Value("${dictionary.api.key}")
     private String apiKey;
 
-    @Value("${woordle.dictionary.base-url}")
+    @Value("${dictionary.base-url}")
     private String baseUrl;
 
-    @Value("${woordle.dictionary.host}")
+    @Value("${dictionary.host}")
     private String hostHeader;
 
     private HttpEntity<Void> createRequestEntity() {
@@ -42,7 +46,7 @@ public class WordService {
     public String getRandomWord() {
 
         /*
-         For MVP, gets a random 5-letter word from the dictionary API.
+         For MVP, gets a random 5-letter word from the dictionary API using getRandomWord(int length).
          */
 
         return getRandomWord(5);
@@ -68,13 +72,21 @@ public class WordService {
                     baseUrl + "/words/?letters=" + length + "&random=true",
                     HttpMethod.GET, requestEntity, String.class);
 
+            // WordsAPI returns a 4xx status code if no words of that length are available
             if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
                 throw new IllegalArgumentException("No words of length " + length + " available");
             } else {
-                return response.getBody();
+                // Parse the response body to extract the word
+                Word wordObj = objectMapper.readValue(response.getBody(), Word.class);
+                if (wordObj != null) {
+                    wordObj.populateCharacters();
+                    return wordObj.getWord();
+                } else {
+                    throw new WordServiceException("Received invalid word from dictionary API");
+                }
             }
-        } catch (RestClientException e) {
-            throw new WordServiceException("Failed to fetch random word from dictionary API", e);
+        } catch (RestClientException | IOException e) {
+            throw new WordServiceException("Failed to fetch or parse random word from dictionary API", e);
         }
 
     }
