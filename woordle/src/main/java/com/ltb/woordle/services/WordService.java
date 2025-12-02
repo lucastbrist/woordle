@@ -9,16 +9,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+
+import java.util.*;
 
 @Service
 public class WordService {
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
+
+    public WordService(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     @Value("${dictionary.api.key}")
     private String apiKey;
@@ -94,7 +95,7 @@ public class WordService {
 
     }
 
-    public ArrayList<Character> handleGuess(ArrayList<Character> characters, String answer) {
+    public List<Character> handleGuess(ArrayList<Character> characters, String answer) {
 
         /*
          The greater method that handles a player's guess.
@@ -122,7 +123,7 @@ public class WordService {
 
             // Else, check letters for presence and position
             } else {
-                feedback = checkLetters(guess, answer);
+                feedback = (ArrayList<Character>)checkLetters(guess, answer);
             }
         }
 
@@ -146,7 +147,7 @@ public class WordService {
         for (Character character : characters) {
             guess.append(character);
         }
-        return String.valueOf(guess);
+        return guess.toString();
     }
 
     public boolean isValidWord(String guess) {
@@ -190,13 +191,13 @@ public class WordService {
 
         // Input validation
         if (guess == null || answer == null) {
-            throw new RuntimeException("Guess and answer cannot be null.");
+            throw new IllegalArgumentException("Guess and answer cannot be null.");
         }
 
         return Objects.equals(guess, answer);
     }
 
-    public ArrayList<Character> checkLetters(String guess, String answer) {
+    public List<Character> checkLetters(String guess, String answer) {
 
         /*
          This greater method will check each letter in String guess
