@@ -64,7 +64,7 @@ public class WordService {
     public String getRandomWord(int length) {
 
         if (length <= 0 || length > 15) {
-            throw new IllegalArgumentException("Length must be a positive integer no greater than 20.");
+            throw new IllegalArgumentException("Length must be a positive integer no greater than 15.");
         }
 
         try {
