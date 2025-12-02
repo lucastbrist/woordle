@@ -122,7 +122,7 @@ public class DictionaryService {
                     baseUrl + "/" + guess,
                     HttpMethod.GET, requestEntity, String.class);
 
-            // WordsAPI returns a 404 if a word is not present
+            // WordsAPI returns a 2xx status if a word is present
             return response.getStatusCode().is2xxSuccessful();
         } catch (RestClientException e) {
             throw new DictionaryServiceException("Failed to validate word \"" + guess + "\"", e);
