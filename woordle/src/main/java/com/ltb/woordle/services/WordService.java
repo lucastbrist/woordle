@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
 public class WordService {
@@ -22,6 +23,11 @@ public class WordService {
     private final RestTemplate restTemplate;
 
     private final ObjectMapper objectMapper;
+
+    /**
+     * Regex to allow only a-z and A-Z letters in fetched and guessed words.
+     */
+    private static final Pattern ALPHABETIC_PATTERN = Pattern.compile("^[a-zA-Z]+$");
 
     public WordService(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
@@ -65,32 +71,40 @@ public class WordService {
      */
     @NotNull
     public String getRandomWord(int length) {
-
         if (length <= 0 || length > 15) {
             throw new IllegalArgumentException("Length must be a positive integer no greater than 15.");
         }
 
         try {
-            HttpEntity<Void> requestEntity = createRequestEntity();
-            ResponseEntity<String> response = restTemplate.exchange(
-                    baseUrl + "/words/?letters=" + length + "&random=true",
-                    HttpMethod.GET, requestEntity, String.class);
 
-            if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
-                throw new IllegalArgumentException("No words of length " + length + " available");
-            } else {
+            HttpEntity<Void> requestEntity = createRequestEntity();
+            String word;
+
+            do {
+                ResponseEntity<String> response = restTemplate.exchange(
+                        baseUrl + "/words/?letters=" + length + "&random=true",
+                        HttpMethod.GET, requestEntity, String.class);
+
+                if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
+                    throw new IllegalArgumentException("No words of length " + length + " available");
+                }
+
                 Word wordObj = objectMapper.readValue(response.getBody(), Word.class);
-                if (wordObj != null) {
-                    wordObj.populateCharacters();
-                    return normalizeWord(wordObj.getWord());
-                } else {
+
+                if (wordObj == null) {
                     throw new WordServiceException("Received invalid word from dictionary API");
                 }
-            }
+
+                wordObj.populateCharacters();
+                word = normalizeWord(wordObj.getWord());
+
+            } while (!isValidAlphabeticWord(word));
+
+            return word;
+
         } catch (RestClientException | IOException e) {
             throw new WordServiceException("Failed to fetch or parse random word from dictionary API", e);
         }
-
     }
 
     /**
@@ -160,8 +174,7 @@ public class WordService {
         if (word == null || word.isEmpty()) {
             throw new IllegalArgumentException("Word passed to alphabetic validation cannot be null.");
         }
-        // Regex to allow only a-z and A-Z letters
-        return word.matches("^[a-zA-Z]+$");
+        return ALPHABETIC_PATTERN.matcher(word).matches();
     }
 
     @Contract("null -> fail")
@@ -183,7 +196,7 @@ public class WordService {
                     baseUrl +"/" + guess,
                     HttpMethod.GET, requestEntity, String.class);
 
-            // wordsapi returns a 404 if a word is not present
+            // WordsAPI returns a 404 if a word is not present
             return response.getStatusCode().is2xxSuccessful();
         } catch (RestClientException e) {
             throw new WordServiceException("Failed to validate word \"" + guess + "\"", e);
