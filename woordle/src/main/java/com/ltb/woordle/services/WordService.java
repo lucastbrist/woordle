@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -54,6 +55,7 @@ public class WordService {
 
     /**
      * For MVP, fetches a random 5-letter word by wrapping a more flexible API-calling method.
+     *
      * @return a String of length 5 from the dictionary API.
      */
     @NotNull
@@ -67,7 +69,7 @@ public class WordService {
      * @param length length of the desired word; must be between 1 and 15.
      * @return a random word of the specified length.
      * @throws IllegalArgumentException if length is invalid or no word is available.
-     * @throws WordServiceException if there is an error communicating with the dictionary API.
+     * @throws WordServiceException     if there is an error communicating with the dictionary API.
      */
     @NotNull
     public String getRandomWord(int length) {
@@ -113,7 +115,7 @@ public class WordService {
      * If valid, checks the guess against the answer for correctness and letter presence.
      *
      * @param characters List of Characters representing the player's guess.
-     * @param answer The correct answer word.
+     * @param answer     The correct answer word.
      * @return A List of Characters representing feedback: 'C' for Correct, 'P' for Present, 'A' for Absent.
      * @throws IllegalArgumentException if input is invalid.
      */
@@ -193,7 +195,7 @@ public class WordService {
         try {
             HttpEntity<Void> requestEntity = createRequestEntity();
             ResponseEntity<String> response = restTemplate.exchange(
-                    baseUrl +"/" + guess,
+                    baseUrl + "/" + guess,
                     HttpMethod.GET, requestEntity, String.class);
 
             // WordsAPI returns a 404 if a word is not present
@@ -217,7 +219,7 @@ public class WordService {
      * Checks each letter in String guess for presence and position accuracy within String answer.
      * 'C' for Correct position, 'P' for Present but wrong position, and 'A' for Absent.
      *
-     * @param guess the guessed word
+     * @param guess  the guessed word
      * @param answer the stored answer word
      * @return a List of Characters representing feedback for each letter in the guess
      */
