@@ -62,8 +62,8 @@ public class WordService {
          */
 
         // Input validation
-        if (length <= 0) {
-            throw new IllegalArgumentException("Length must be a positive integer.");
+        if (length <= 0 || length > 20) {
+            throw new IllegalArgumentException("Length must be a positive integer no greater than 20.");
         }
 
         try {
@@ -72,7 +72,6 @@ public class WordService {
                     baseUrl + "/words/?letters=" + length + "&random=true",
                     HttpMethod.GET, requestEntity, String.class);
 
-            // WordsAPI returns a 4xx status code if no words of that length are available
             if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
                 throw new IllegalArgumentException("No words of length " + length + " available");
             } else {
@@ -91,7 +90,7 @@ public class WordService {
 
     }
 
-    public List<Character> handleGuess(ArrayList<Character> characters, String answer) {
+    public List<Character> handleGuess(List<Character> characters, String answer) {
 
         /*
          The greater method that handles a player's guess.
@@ -106,7 +105,7 @@ public class WordService {
         String guess = concatenateGuess(characters);
 
         // Instantiate an ArrayList<Character> to hold feedback to be returned
-        ArrayList<Character> feedback = new ArrayList<>();
+        List<Character> feedback = new ArrayList<>();
 
         // If the guessed word is valid, check it against the answer
         if (isValidWord(guess)) {
@@ -119,7 +118,7 @@ public class WordService {
 
             // Else, check letters for presence and position
             } else {
-                feedback = (ArrayList<Character>)checkLetters(guess, answer);
+                feedback = checkLetters(guess, answer);
             }
         }
 
@@ -127,7 +126,7 @@ public class WordService {
 
     }
 
-    public String concatenateGuess(ArrayList<Character> characters) {
+    public String concatenateGuess(List<Character> characters) {
 
         /*
          Takes in the guessed characters and returns them as a String.
@@ -160,21 +159,15 @@ public class WordService {
         }
 
         try {
-            // Establish headers for API request because RapidAPI requires them
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
-            headers.set("x-rapidapi-key", apiKey);
-
-            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
+            HttpEntity<Void> requestEntity = createRequestEntity();
             ResponseEntity<String> response = restTemplate.exchange(
-                    "https://wordsapiv1.p.rapidapi.com/words/" + guess,
+                    baseUrl +"/" + guess,
                     HttpMethod.GET, requestEntity, String.class);
 
             // wordsapi returns a 404 if a word is not present
-            return response.hasBody() && !response.getStatusCode().is4xxClientError();
+            return response.getStatusCode().is2xxSuccessful();
         } catch (RestClientException e) {
-            throw new WordServiceException("Failed to fetch random word from dictionary API", e);
+            throw new WordServiceException("Failed to validate word \"" + guess + "\"", e);
         }
 
     }
