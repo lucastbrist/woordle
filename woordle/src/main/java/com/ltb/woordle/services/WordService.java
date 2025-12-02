@@ -100,6 +100,11 @@ public class WordService {
          The greater method that handles a player's guess.
          */
 
+        // Input validation
+        if (characters == null || characters.isEmpty() || answer == null || answer.isEmpty()) {
+            throw new RuntimeException("Characters and answer cannot be null or empty.");
+        }
+
         // First, concatenate the player's guessed characters into a String
         String guess = concatenateGuess(characters);
 
