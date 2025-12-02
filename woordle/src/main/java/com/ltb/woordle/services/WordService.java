@@ -226,8 +226,11 @@ public class WordService {
     @Contract("null, _ -> fail; !null, null -> fail")
     private @NotNull List<Character> checkLetters(String guess, String answer) {
 
-        if (guess == null || answer == null || guess.isEmpty() || answer.isEmpty() || guess.length() != answer.length()) {
-            throw new IllegalArgumentException("Guess and answer passed to checkLetters() must be non-null, non-empty, and of the same length.");
+        if (guess == null || answer == null
+                || guess.isEmpty() || answer.isEmpty()
+                || guess.length() != answer.length()) {
+            throw new IllegalArgumentException("Guess and answer passed to checkLetters() must be non-null, " +
+                    "non-empty, and of the same length.");
         }
 
         ArrayList<Character> feedbackArray = new ArrayList<>();
