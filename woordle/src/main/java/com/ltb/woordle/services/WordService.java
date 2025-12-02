@@ -76,11 +76,10 @@ public class WordService {
             if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
                 throw new IllegalArgumentException("No words of length " + length + " available");
             } else {
-                // Parse the response body to extract the word
                 Word wordObj = objectMapper.readValue(response.getBody(), Word.class);
                 if (wordObj != null) {
                     wordObj.populateCharacters();
-                    return wordObj.getWord();
+                    return wordObj.getWord().toLowerCase(Locale.ROOT);
                 } else {
                     throw new WordServiceException("Received invalid word from dictionary API");
                 }
@@ -97,24 +96,22 @@ public class WordService {
             throw new IllegalArgumentException("Characters and answer cannot be null or empty.");
         }
 
-        // First, concatenate the player's guessed characters into a String
-        String guess = concatenateGuess(characters);
-
-        // Instantiate an ArrayList<Character> to hold feedback to be returned
+        String normalizedGuess = concatenateGuess(characters).toLowerCase(Locale.ROOT);
+        String normalizedAnswer = answer.toLowerCase(Locale.ROOT);
         List<Character> feedback = new ArrayList<>();
 
         // If the guessed word is valid, check it against the answer
-        if (isValidWord(guess)) {
-            if (isCorrectWord(guess, answer)) {
+        if (isValidWord(normalizedGuess)) {
+            if (isCorrectWord(normalizedGuess, normalizedAnswer)) {
 
                 // If the guess is exactly correct, return all 'C's
-                for (int i = 0; i < guess.length(); i++) {
+                for (int i = 0; i < normalizedGuess.length(); i++) {
                     feedback.add('C');
                 }
 
             // Else, check letters for presence and position
             } else {
-                feedback = checkLetters(guess, answer);
+                feedback = checkLetters(normalizedGuess, normalizedAnswer);
             }
         }
 
@@ -151,7 +148,7 @@ public class WordService {
         try {
             HttpEntity<Void> requestEntity = createRequestEntity();
             ResponseEntity<String> response = restTemplate.exchange(
-                    baseUrl +"/" + guess,
+                    baseUrl +"/" + guess.toLowerCase(Locale.ROOT),
                     HttpMethod.GET, requestEntity, String.class);
 
             // wordsapi returns a 404 if a word is not present
@@ -171,72 +168,56 @@ public class WordService {
         return Objects.equals(guess, answer);
     }
 
+    /**
+     * Checks each letter in String guess for presence and position accuracy within String answer.
+     * 'C' for Correct position, 'P' for Present but wrong position, and 'A' for Absent.
+     *
+     * @param guess the guessed word
+     * @param answer the stored answer word
+     * @return a List of Characters representing feedback for each letter in the guess
+     */
     public List<Character> checkLetters(String guess, String answer) {
-
-        /*
-         This greater method will check each letter in String guess
-         for presence and position accuracy within String answer by looping through each.
-        */
 
         if (guess == null || answer == null || guess.length() != answer.length()) {
             throw new IllegalArgumentException("Guess and answer must be non-null and of the same length.");
         }
 
-        // First, instantiate an ArrayList<Character> of coded feedback characters to be mapped onto.
-        // This array will mark letters in String guess as
-        // 'C', 'A', or 'P' for Correct, Absent, or Present, respectively
         ArrayList<Character> feedbackArray = new ArrayList<>();
         for (int i = 0; i < guess.length(); i++) {
             feedbackArray.add('A'); // default characters to 'A' for Absent
         }
 
-        // Second, convert String guess and String answer to ArrayList<Character>
-        ArrayList<Character> guessArray = new ArrayList<>();
-        for (char c : guess.toCharArray()) {
-            guessArray.add(c);
-        }
-        ArrayList<Character> answerArray = new ArrayList<>();
-        for (char c : answer.toCharArray()) {
-            answerArray.add(c);
-        }
-
         // counts HashMap keeps track of non-matching characters
         Map<Character, Integer> counts = new HashMap<>();
 
-        // First pass: Loop through guessArray and answerArray,
-        // marking letters as 'C' for Correct in feedbackArray
-        for (int i = 0; i < guessArray.size(); i++) {
-
-            char g = guessArray.get(i);
-            char a = answerArray.get(i);
+        // First pass: mark correct positions
+        for (int i = 0; i < guess.length(); i++) {
+            char g = guess.charAt(i);
+            char a = answer.charAt(i);
 
             if (g == a) {
                 feedbackArray.set(i, 'C');
             } else {
-                // count only answer letters that were NOT correct
                 counts.put(a, counts.getOrDefault(a, 0) + 1);
             }
-
         }
 
-        // Second pass: Loop through guessArray and answerArray,
-        // marking letters as 'P' for Present or 'A' for Absent in feedbackArray
-        for (int i = 0; i < guessArray.size(); i++) {
-            if (feedbackArray.get(i) == 'C') {
-                continue; // because this is already handled
-            }
+        // Second pass: mark present/absent
+        for (int i = 0; i < guess.length(); i++) {
+            if (feedbackArray.get(i) == 'C') continue;      // because this is already handled
 
-            char g = guessArray.get(i);
+            char g = guess.charAt(i);
             Integer count = counts.get(g);
             if (count != null && count > 0) {
                 feedbackArray.set(i, 'P');      // Present but wrong position
-                counts.put(g, count - 1);       // consume one occurrence
+                counts.put(g, count - 1);       // Consume one occurrence
             } else {
-                feedbackArray.set(i, 'A');      // Absent (already default, but make explicit)
+                feedbackArray.set(i, 'A');      // Default but make explicit
             }
         }
 
         return feedbackArray;
+
     }
 
 }
