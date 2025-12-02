@@ -24,36 +24,27 @@ public class WordService {
     @Value("${dictionary.api.key}")
     private String apiKey;
 
+    @Value("${woordle.dictionary.base-url}")
+    private String baseUrl;
+
+    @Value("${woordle.dictionary.host}")
+    private String hostHeader;
+
+    private HttpEntity<Void> createRequestEntity() {
+        // RapidAPI requires these headers for authentication
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-rapidapi-host", hostHeader);
+        headers.set("x-rapidapi-key", apiKey);
+        return new HttpEntity<>(headers);
+    }
+
     public String getRandomWord() {
 
         /*
-         Gets a random word from the dictionary API.
-         It can take any int length in its constructor, but for MVP,
-         it is defaulted to a length of 5.
-
-         This is the base method that does not take in length as an argument.
+         For MVP, gets a random 5-letter word from the dictionary API.
          */
 
-        try {
-            // Establish headers for API request because RapidAPI requires them
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
-            headers.set("x-rapidapi-key", apiKey);
-
-            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    "https://wordsapiv1.p.rapidapi.com/words/?letters=5&random=true",
-                    HttpMethod.GET, requestEntity, String.class);
-
-            if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
-                throw new IllegalArgumentException("No words available");
-            } else {
-                return response.getBody();
-            }
-        } catch (RestClientException | IllegalArgumentException e) {
-            throw new RuntimeException(e);
-        }
+        return getRandomWord(5);
 
     }
 
@@ -63,8 +54,6 @@ public class WordService {
          Gets a random word from the dictionary API.
          It can take any int length in its constructor, but for MVP,
          it is defaulted to a length of 5.
-
-         This is the overloaded method that takes in length as an argument.
          */
 
         // Input validation
@@ -73,15 +62,9 @@ public class WordService {
         }
 
         try {
-            // Establish headers for API request because RapidAPI requires them
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
-            headers.set("x-rapidapi-key", apiKey);
-
-            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
+            HttpEntity<Void> requestEntity = createRequestEntity();
             ResponseEntity<String> response = restTemplate.exchange(
-                    "https://wordsapiv1.p.rapidapi.com/words/?letters=" + length + "&random=true",
+                    baseUrl + "/words/?letters=" + length + "&random=true",
                     HttpMethod.GET, requestEntity, String.class);
 
             if (!response.hasBody() || response.getStatusCode().is4xxClientError()) {
