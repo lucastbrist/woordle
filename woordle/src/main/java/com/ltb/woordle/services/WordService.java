@@ -53,16 +53,17 @@ public class WordService {
 
     }
 
+    /**
+     * Fetches a random word of the specified length from the dictionary API.
+     *
+     * @param length length of the desired word; must be between 1 and 15.
+     * @return a random word of the specified length.
+     * @throws IllegalArgumentException if length is invalid or no word is available.
+     * @throws WordServiceException if there is an error communicating with the dictionary API.
+     */
     public String getRandomWord(int length) {
 
-        /*
-         Gets a random word from the dictionary API.
-         It can take any int length in its constructor, but for MVP,
-         it is defaulted to a length of 5.
-         */
-
-        // Input validation
-        if (length <= 0 || length > 20) {
+        if (length <= 0 || length > 15) {
             throw new IllegalArgumentException("Length must be a positive integer no greater than 20.");
         }
 
@@ -92,11 +93,6 @@ public class WordService {
 
     public List<Character> handleGuess(List<Character> characters, String answer) {
 
-        /*
-         The greater method that handles a player's guess.
-         */
-
-        // Input validation
         if (characters == null || characters.isEmpty() || answer == null || answer.isEmpty()) {
             throw new IllegalArgumentException("Characters and answer cannot be null or empty.");
         }
@@ -128,11 +124,6 @@ public class WordService {
 
     public String concatenateGuess(List<Character> characters) {
 
-        /*
-         Takes in the guessed characters and returns them as a String.
-         */
-
-        // Input validation
         if (characters == null || characters.isEmpty()) {
             throw new IllegalArgumentException("Character list cannot be null or empty.");
         }
@@ -153,7 +144,6 @@ public class WordService {
          Returns boolean based on API response.
         */
 
-        // Input validation
         if (guess == null || guess.isEmpty()) {
             return false;
         }
@@ -174,11 +164,6 @@ public class WordService {
 
     public boolean isCorrectWord(String guess, String answer) {
 
-        /*
-         Simply checks String guess for exactly matching String answer.
-         */
-
-        // Input validation
         if (guess == null || answer == null) {
             throw new IllegalArgumentException("Guess and answer cannot be null.");
         }
@@ -193,7 +178,6 @@ public class WordService {
          for presence and position accuracy within String answer by looping through each.
         */
 
-        // Input validation
         if (guess == null || answer == null || guess.length() != answer.length()) {
             throw new IllegalArgumentException("Guess and answer must be non-null and of the same length.");
         }
