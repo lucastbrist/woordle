@@ -10,8 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import static com.ltb.woordle.utils.WordValidator.*;
 
@@ -110,10 +109,11 @@ public class DictionaryService {
          Method to validate player guess.
          Searches dictionary API for the guessed word.
          Returns boolean based on API response.
+         Throws various exceptions on failure states.
         */
 
         if (guess == null || guess.isEmpty()) {
-            throw new IllegalArgumentException("Word passed to dictionary validation cannot be null or empty.");
+            throw new IllegalArgumentException("Word passed to dictionary validation cannot be null or empty");
         }
 
         try {
@@ -122,10 +122,28 @@ public class DictionaryService {
                     baseUrl + "/" + guess,
                     HttpMethod.GET, requestEntity, String.class);
 
-            // WordsAPI returns a 2xx status if a word is present
             return response.getStatusCode().is2xxSuccessful();
+
+        } catch (HttpClientErrorException.NotFound e) {
+            // 404 = word doesn't exist - this is expected, not an error
+            return false;
+        }
+
+        // Failure states
+        catch (HttpClientErrorException.Unauthorized e) {
+            throw new DictionaryServiceException("Dictionary API authentication failed", e);
+
+        } catch (HttpClientErrorException e) {
+            throw new DictionaryServiceException("Dictionary API client error: " + e.getStatusCode(), e);
+
+        } catch (HttpServerErrorException e) {
+            throw new DictionaryServiceException("Dictionary API server error: " + e.getStatusCode(), e);
+
+        } catch (ResourceAccessException e) {
+            throw new DictionaryServiceException("Cannot reach dictionary API", e);
+
         } catch (RestClientException e) {
-            throw new DictionaryServiceException("Failed to validate word \"" + guess + "\"", e);
+            throw new DictionaryServiceException("Failed to validate word", e);
         }
 
     }
